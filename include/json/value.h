@@ -284,6 +284,7 @@ private:
       unsigned length_ : 30; // 1GB max
     };
 
+    // 实际存储key的地方
     char const* cstr_; // actually, a prefixed string, unless policy is noDup
     union {
       ArrayIndex index_;
@@ -292,7 +293,7 @@ private:
   };
 
 public:
-  typedef std::map<CZString, Value> ObjectValues;
+  typedef std::map<CZString, Value> ObjectValues; // std::map<CZString, Value> 键值对
 #endif // ifndef JSONCPP_DOC_EXCLUDE_IMPLEMENTATION
 
 public:
@@ -620,6 +621,8 @@ private:
     double real_;
     bool bool_;
     char* string_; // if allocated_, ptr to { unsigned, char[] }.
+
+    // 将所有的存贮着key的CZString保存起来
     ObjectValues* map_;
   } value_;
 

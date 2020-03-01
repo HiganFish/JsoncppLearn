@@ -127,8 +127,7 @@ static inline char* duplicateStringValue(const char* value, size_t length) {
   return newString;
 }
 
-/* Record the length as a prefix.
- */
+// 复制value 并在复制value的前方加上char* value长度 尾部增加0
 static inline char* duplicateAndPrefixStringValue(const char* value,
                                                   unsigned int length) {
   // Avoid an integer overflow in the call to malloc below by limiting length
@@ -337,6 +336,7 @@ bool Value::CZString::isStaticString() const {
  * memset( this, 0, sizeof(Value) )
  * This optimization is used in ValueInternalMap fast allocator.
  */
+// 默认的Value构造方法
 Value::Value(ValueType type) {
   static char const emptyString[] = "";
   initBasic(type);
@@ -436,11 +436,12 @@ Value::~Value() {
   value_.uint_ = 0;
 }
 
-Value& Value::operator=(const Value& other) {
+Value& Value::operator=(const Value&    ) {
   Value(other).swap(*this);
   return *this;
 }
 
+// 使用swap替换掉原来的value中的相应属性
 Value& Value::operator=(Value&& other) {
   other.swap(*this);
   return *this;
@@ -957,6 +958,7 @@ const Value& Value::operator[](int index) const {
   return (*this)[ArrayIndex(index)];
 }
 
+// 初始化 设定v的类型
 void Value::initBasic(ValueType type, bool allocated) {
   setType(type);
   setIsAllocated(allocated);
@@ -1046,18 +1048,28 @@ Value& Value::resolveReference(const char* key) {
 }
 
 // @param key is not null-terminated.
+// 统一添加请求
 Value& Value::resolveReference(char const* key, char const* end) {
+    // 开头就进行校验
   JSON_ASSERT_MESSAGE(
       type() == nullValue || type() == objectValue,
       "in Json::Value::resolveReference(key, end): requires objectValue");
+
+  // 这里将 默认构造函数生成的替换掉
   if (type() == nullValue)
     *this = Value(objectValue);
+
+  // 校验完就 将key 添加到一个CZString的c_str中
   CZString actualKey(key, static_cast<unsigned>(end - key),
                      CZString::duplicateOnCopy);
+
+  //lower_bound k是一个对象, 猜测用到了这个对象中的重载运算符 <
+  // 查找指定的key在map中对应的Value 存在则返回引用 不存在则创建并返回引用
   auto it = value_.map_->lower_bound(actualKey);
   if (it != value_.map_->end() && (*it).first == actualKey)
     return (*it).second;
 
+  // 创建并插入
   ObjectValues::value_type defaultValue(actualKey, nullSingleton());
   it = value_.map_->insert(it, defaultValue);
   Value& value = (*it).second;
@@ -1103,6 +1115,7 @@ Value const& Value::operator[](const String& key) const {
   return *found;
 }
 
+// 统一[]调用 Value["xxx"]
 Value& Value::operator[](const char* key) {
   return resolveReference(key, key + strlen(key));
 }

@@ -16,6 +16,8 @@ int main() {
   Json::Value root;
   Json::Value data;
   constexpr bool shouldUseOldWay = false;
+
+  // 左侧返回Value的引用
   root["action"] = "run";
   data["number"] = 1;
   root["data"] = data;
@@ -25,6 +27,7 @@ int main() {
     const std::string json_file = writer.write(root);
     std::cout << json_file << std::endl;
   } else {
+    // 配置文件也是Value对象, 我用我自己.jpg
     Json::StreamWriterBuilder builder;
     const std::string json_file = Json::writeString(builder, root);
     std::cout << json_file << std::endl;

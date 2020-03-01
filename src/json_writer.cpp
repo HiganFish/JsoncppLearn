@@ -900,6 +900,8 @@ private:
   unsigned int rightMargin_;
   String indentation_;
   CommentStyle::Enum cs_;
+
+  // 冒号的标志
   String colonSymbol_;
   String nullSymbol_;
   String endingLineFeedSymbol_;
@@ -920,6 +922,8 @@ BuiltStyledStreamWriter::BuiltStyledStreamWriter(
       addChildValues_(false), indented_(false),
       useSpecialFloats_(useSpecialFloats), emitUTF8_(emitUTF8),
       precision_(precision), precisionType_(precisionType) {}
+
+// 生成输出流
 int BuiltStyledStreamWriter::write(Value const& root, OStream* sout) {
   sout_ = sout;
   addChildValues_ = false;
@@ -935,6 +939,8 @@ int BuiltStyledStreamWriter::write(Value const& root, OStream* sout) {
   sout_ = nullptr;
   return 0;
 }
+
+
 void BuiltStyledStreamWriter::writeValue(Value const& value) {
   switch (value.type()) {
   case nullValue:
@@ -982,6 +988,8 @@ void BuiltStyledStreamWriter::writeValue(Value const& value) {
         writeCommentBeforeValue(childValue);
         writeWithIndent(valueToQuotedStringN(
             name.data(), static_cast<unsigned>(name.length()), emitUTF8_));
+
+        // :
         *sout_ << colonSymbol_;
         writeValue(childValue);
         if (++it == members.end()) {
@@ -1082,6 +1090,7 @@ void BuiltStyledStreamWriter::pushValue(String const& value) {
     *sout_ << value;
 }
 
+// 打印换行
 void BuiltStyledStreamWriter::writeIndent() {
   // blep intended this to look at the so-far-written string
   // to determine whether we are already indented, but
@@ -1108,6 +1117,7 @@ void BuiltStyledStreamWriter::unindent() {
   indentString_.resize(indentString_.size() - indentation_.size());
 }
 
+// Comment就是评论 可以在输出的json前面写东西
 void BuiltStyledStreamWriter::writeCommentBeforeValue(Value const& root) {
   if (cs_ == CommentStyle::None)
     return;
@@ -1156,6 +1166,8 @@ StreamWriter::~StreamWriter() = default;
 StreamWriter::Factory::~Factory() = default;
 StreamWriterBuilder::StreamWriterBuilder() { setDefaults(&settings_); }
 StreamWriterBuilder::~StreamWriterBuilder() = default;
+
+// 读取配置文件 将文本类型的配置v转换成内置类型 生成对象
 StreamWriter* StreamWriterBuilder::newStreamWriter() const {
   const String indentation = settings_["indentation"].asString();
   const String cs_str = settings_["commentStyle"].asString();
