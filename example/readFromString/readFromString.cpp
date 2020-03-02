@@ -20,7 +20,10 @@ int main() {
     Json::Reader reader;
     reader.parse(rawJson, root);
   } else {
+      // 默认构造函数 使用默认的配置
     Json::CharReaderBuilder builder;
+
+    // 根据builder的配置生成CharReader类
     const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
     if (!reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &root,
                        &err)) {

@@ -901,6 +901,7 @@ private:
   OurReader(OurReader const&);      // no impl
   void operator=(OurReader const&); // no impl
 
+  // 下一次数据的类型
   enum TokenType {
     tokenEndOfStream = 0,
     tokenObjectBegin,
@@ -924,7 +925,9 @@ private:
   class Token {
   public:
     TokenType type_;
+    // [start_, end_)
     Location start_;
+    // [start_, end_)
     Location end_;
   };
 
@@ -977,11 +980,16 @@ private:
 
   using Nodes = std::stack<Value*>;
 
+  // 存储Value指针的stack
   Nodes nodes_{};
   Errors errors_{};
   String document_{};
+
+  // 存储parse传入的字符串头指针
   Location begin_ = nullptr;
+  // 存储parse传入的字符串尾指针
   Location end_ = nullptr;
+  // 当前解析的位置
   Location current_ = nullptr;
   Location lastValueEnd_ = nullptr;
   Value* lastValue_ = nullptr;
@@ -1016,12 +1024,13 @@ bool OurReader::parse(const char* beginDoc, const char* endDoc, Value& root,
   current_ = begin_;
   lastValueEnd_ = nullptr;
   lastValue_ = nullptr;
+
   commentsBefore_.clear();
   errors_.clear();
   while (!nodes_.empty())
     nodes_.pop();
   nodes_.push(&root);
-
+  // 读取
   bool successful = readValue();
   nodes_.pop();
   Token token;
@@ -1061,8 +1070,11 @@ bool OurReader::readValue() {
     commentsBefore_.clear();
   }
 
-  switch (token.type_) {
+  // skipCommentTokens中获取到了下次读取的数据类型
+  switch (token.type_)
+  {
   case tokenObjectBegin:
+      // 2020年3月2日18:56:00
     successful = readObject(token);
     currentValue().setOffsetLimit(current_ - begin_);
     break;
@@ -1139,7 +1151,7 @@ bool OurReader::readValue() {
 
   return successful;
 }
-
+// 有评论则读取, 没有则获取下一次的数据类型
 void OurReader::skipCommentTokens(Token& token) {
   if (features_.allowComments_) {
     do {
@@ -1150,6 +1162,7 @@ void OurReader::skipCommentTokens(Token& token) {
   }
 }
 
+// 获取到下一下 数据的类型 保存在type_ 同时移动指针准备下一次type_获取
 bool OurReader::readToken(Token& token) {
   skipSpaces();
   token.start_ = current_;
@@ -1170,6 +1183,7 @@ bool OurReader::readToken(Token& token) {
     break;
   case '"':
     token.type_ = tokenString;
+    // 其中操作current_后 现在start_指向开头的" 结尾将current_赋值给end_ end_是字符串末尾的"的下一个
     ok = readString();
     break;
   case '\'':
@@ -1401,6 +1415,7 @@ bool OurReader::readNumber(bool checkInf) {
   }
   return true;
 }
+// 并没有存储字符 移动current_指针 遇到字符串结尾后返回(正好移动到了字符串结尾的双引号后)
 bool OurReader::readString() {
   Char c = 0;
   while (current_ != end_) {
@@ -1413,6 +1428,7 @@ bool OurReader::readString() {
   return c == '"';
 }
 
+// 并没有存储字符 移动current_指针 遇到字符串结尾后返回(正好移动到了字符串结尾的单引号后)
 bool OurReader::readStringSingleQuote() {
   Char c = 0;
   while (current_ != end_) {
@@ -1433,19 +1449,32 @@ bool OurReader::readObject(Token& token) {
   currentValue().setOffsetStart(token.start_ - begin_);
   while (readToken(tokenName)) {
     bool initialTokenOk = true;
+
     while (tokenName.type_ == tokenComment && initialTokenOk)
-      initialTokenOk = readToken(tokenName);
+    {
+        initialTokenOk = readToken(tokenName);
+    }
     if (!initialTokenOk)
-      break;
+    {
+        break;
+    }
+
     if (tokenName.type_ == tokenObjectEnd &&
         (name.empty() ||
-         features_.allowTrailingCommas_)) // empty object or trailing comma
-      return true;
+            features_.allowTrailingCommas_)) // empty object or trailing comma
+    {
+        return true;
+    }
     name.clear();
-    if (tokenName.type_ == tokenString) {
-      if (!decodeString(tokenName, name))
-        return recoverFromError(tokenObjectEnd);
-    } else if (tokenName.type_ == tokenNumber && features_.allowNumericKeys_) {
+    if (tokenName.type_ == tokenString)
+    {
+        if (!decodeString(tokenName, name))
+        {
+            return recoverFromError(tokenObjectEnd);
+        }
+    }
+    else if (tokenName.type_ == tokenNumber && features_.allowNumericKeys_)
+    {
       Value numberName;
       if (!decodeNumber(tokenName, numberName))
         return recoverFromError(tokenObjectEnd);
@@ -1465,6 +1494,7 @@ bool OurReader::readObject(Token& token) {
       return addErrorAndRecover("Missing ':' after object member name", colon,
                                 tokenObjectEnd);
     }
+    // 这里保存了name 这个k 将name的 v放入了顶层
     Value& value = currentValue()[name];
     nodes_.push(&value);
     bool ok = readValue();
@@ -1473,6 +1503,7 @@ bool OurReader::readObject(Token& token) {
       return recoverFromError(tokenObjectEnd);
 
     Token comma;
+    // 读取完一个 k v 一定是一个, 或 }
     if (!readToken(comma) ||
         (comma.type_ != tokenObjectEnd && comma.type_ != tokenArraySeparator &&
          comma.type_ != tokenComment)) {
@@ -1654,11 +1685,17 @@ bool OurReader::decodeString(Token& token) {
   return true;
 }
 
-bool OurReader::decodeString(Token& token, String& decoded) {
+// 转化string到?
+bool OurReader::decodeString(Token& token, String& decoded)
+{
   decoded.reserve(static_cast<size_t>(token.end_ - token.start_ - 2));
+
+  // 上一次获取token的type_后 现在start_指向开头的" end_是字符串末尾的"的下一个
+  // 下面使用的[ )
   Location current = token.start_ + 1; // skip '"'
   Location end = token.end_ - 1;       // do not include '"'
-  while (current != end) {
+  while (current != end)
+  {
     Char c = *current++;
     if (c == '"')
       break;
@@ -1788,7 +1825,9 @@ bool OurReader::addErrorAndRecover(const String& message, Token& token,
 
 Value& OurReader::currentValue() { return *(nodes_.top()); }
 
-OurReader::Char OurReader::getNextChar() {
+// 获取current_指向的字符 并自增
+OurReader::Char OurReader::getNextChar()
+{
   if (current_ == end_)
     return 0;
   return *current_++;
@@ -1856,6 +1895,7 @@ class OurCharReader : public CharReader {
 public:
   OurCharReader(bool collectComments, OurFeatures const& features)
       : collectComments_(collectComments), reader_(features) {}
+
   bool parse(char const* beginDoc, char const* endDoc, Value* root,
              String* errs) override {
     bool ok = reader_.parse(beginDoc, endDoc, *root, collectComments_);
